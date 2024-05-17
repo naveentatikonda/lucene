@@ -19,6 +19,7 @@ package org.apache.lucene.util.quantization;
 import static org.apache.lucene.util.quantization.ScalarQuantizer.SCRATCH_SIZE;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.lucene.index.FloatVectorValues;
@@ -70,6 +71,45 @@ public class TestScalarQuantizer extends LuceneTestCase {
                     floatVectorValues, function, numVecs, bits));
       }
     }
+  }
+
+  public void testQuantizeAndDeQuantize8Bit() throws IOException {
+    VectorSimilarityFunction similarityFunction = VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT;
+    float[][] floatVec = {{-100.0f, 20.0f}, {100.0f, -20.0f}};
+    int numVecs = 2;
+    int dim = 2;
+    FloatVectorValues floatVectorValues = fromFloats(floatVec);
+    ScalarQuantizer scalarQuantizer =
+        ScalarQuantizer.fromVectors(floatVectorValues, 1, numVecs, (byte) 8);
+
+    float[] dequantizedVec = new float[dim];
+    byte[] quantizedVec = new byte[dim];
+
+    // Quantizing and Dequantizing the 1st float vector {-100.0, 20.0}
+    scalarQuantizer.quantize(floatVec[0], quantizedVec, similarityFunction);
+    scalarQuantizer.deQuantize(quantizedVec, dequantizedVec);
+    byte[] expQuantizedVec = {0, -103};
+    float[] expDequantizedVec = new float[] {-100.0f, -180.784f};
+
+    assertArrayEquals(expQuantizedVec, quantizedVec);
+    assertFalse(
+        Arrays.equals(
+            floatVec[0],
+            dequantizedVec)); // The dequantized vector doesn't match with actual float vector
+    assertArrayEquals(expDequantizedVec, dequantizedVec, 0.2f);
+
+    // Quantizing and Dequantizing the 2nd float vector {100.0, -20.0}
+    scalarQuantizer.quantize(floatVec[1], quantizedVec, similarityFunction);
+    scalarQuantizer.deQuantize(quantizedVec, dequantizedVec);
+    expQuantizedVec = new byte[] {-1, 102};
+    expDequantizedVec = new float[] {-100.784f, -20.0f};
+
+    assertArrayEquals(expQuantizedVec, quantizedVec);
+    assertFalse(
+        Arrays.equals(
+            floatVec[1],
+            dequantizedVec)); // The dequantized vector doesn't match with actual float vector
+    assertArrayEquals(expDequantizedVec, dequantizedVec, 0.2f);
   }
 
   public void testQuantizeAndDeQuantize7Bit() throws IOException {
